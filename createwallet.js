@@ -4,6 +4,9 @@ const HDKey = require('hdkey');
 const ethUtil = require('ethereumjs-util');
 
 // Generate a 12-word mnemonic (128 bits for 12 words)
+// Generate a 15-word mnemonic (160 bits for 15 words)
+// Generate a 18-word mnemonic (192 bits for 18 words)
+// Generate a 21-word mnemonic (224 bits for 21 words)
 // Generate a 24-word mnemonic (256 bits for 24 words)
 const mnemonic = bip39.generateMnemonic(128);
 console.log("Your mnemonic phrase:", mnemonic);
