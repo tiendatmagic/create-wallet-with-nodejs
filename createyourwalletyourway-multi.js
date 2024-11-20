@@ -72,12 +72,10 @@ if (isMainThread) {
       if (count % 1000 === 0) {
         console.log(`Worker: Generated ${count} wallets so far.`);
       }
-      const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
-      console.log(foundData);
 
       // Check if the address ends with any of the desired endings
       if (desiredEndings.some((ending) => address.endsWith(ending))) {
-        // const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
+        const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
 
         parentPort.postMessage(foundData); // Send the result to the Main Thread
         // return; // Exit immediately after finding a match (if needed)
