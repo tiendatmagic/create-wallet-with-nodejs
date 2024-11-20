@@ -41,7 +41,7 @@ async function findAddressWithEnding(desiredEndings) {
       // Write to file (create found.txt if it doesn't exist)
       fs.writeFileSync('found.txt', foundData, { flag: 'a' }); // 'a' flag appends to the file if it exists
 
-      break;
+      //    break;
     }
   }
 }
