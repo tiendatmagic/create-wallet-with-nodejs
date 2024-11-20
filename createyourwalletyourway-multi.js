@@ -7,8 +7,8 @@ const os = require('os');
 
 if (isMainThread) {
   // === Main Thread Logic ===
-  const desiredEndings = ['123456', '999999', '000000'];
-  const numThreads = os.cpus().length; // Number of logical CPU cores
+  const desiredEndings = ['1234', '12345', '123456', '99999', '999999', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888'];
+  const numThreads = 5; // Number of logical CPU cores
   console.log(`Detected ${numThreads} CPU cores. Using ${numThreads} threads.`);
 
   console.log(`Main thread: Spawning ${numThreads} workers to find addresses.`);
@@ -72,10 +72,12 @@ if (isMainThread) {
       if (count % 1000 === 0) {
         console.log(`Worker: Generated ${count} wallets so far.`);
       }
+      const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
+      console.log(foundData);
 
       // Check if the address ends with any of the desired endings
       if (desiredEndings.some((ending) => address.endsWith(ending))) {
-        const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
+        // const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
 
         parentPort.postMessage(foundData); // Send the result to the Main Thread
         // return; // Exit immediately after finding a match (if needed)
