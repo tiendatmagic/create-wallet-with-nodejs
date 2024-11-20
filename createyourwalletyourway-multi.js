@@ -7,7 +7,7 @@ const os = require('os');
 
 if (isMainThread) {
   // === Main Thread Logic ===
-  const desiredEndings = ['99999', '999999', '000000'];
+  const desiredEndings = ['123456', '999999', '000000'];
   const numThreads = os.cpus().length; // Number of logical CPU cores
   console.log(`Detected ${numThreads} CPU cores. Using ${numThreads} threads.`);
 
@@ -16,7 +16,7 @@ if (isMainThread) {
   // Create worker threads
   for (let i = 0; i < numThreads; i++) {
     const worker = new Worker(__filename, {
-      workerData: { desiredEndings, batchSize: 1000 }, // Pass desiredEndings and batchSize
+      workerData: { desiredEndings }, // Pass desiredEndings without batchSize
     });
 
     // Listen for messages from the worker
@@ -43,7 +43,7 @@ if (isMainThread) {
   }
 } else {
   // === Worker Thread Logic ===
-  const { desiredEndings, batchSize } = workerData;
+  const { desiredEndings } = workerData;
 
   async function findAddressWithEnding() {
     let mnemonic;
@@ -61,26 +61,24 @@ if (isMainThread) {
       // Create HD wallet from the seed
       hdwallet = HDKey.fromMasterSeed(seed);
 
-      // Derive multiple addresses from the same seed
-      for (let i = 0; i < batchSize; i++) {
-        const wallet = hdwallet.derive(`m/44'/60'/0'/0/${i}`);
-        const address = ethUtil.pubToAddress(wallet.publicKey, true).toString('hex');
+      // Derive the first address from "m/44'/60'/0'/0/0"
+      const wallet = hdwallet.derive("m/44'/60'/0'/0/0");
+      const address = ethUtil.pubToAddress(wallet.publicKey, true).toString('hex');
 
-        // Increment wallet count
-        count++;
+      // Increment wallet count
+      count++;
 
-        // Log the count of generated wallets
-        if (count % 1000 === 0) {
-          console.log(`Worker: Generated ${count} wallets so far.`);
-        }
+      // Log the count of generated wallets
+      if (count % 1000 === 0) {
+        console.log(`Worker: Generated ${count} wallets so far.`);
+      }
 
-        // Check if the address ends with any of the desired endings
-        if (desiredEndings.some((ending) => address.endsWith(ending))) {
-          const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: ${i}`;
+      // Check if the address ends with any of the desired endings
+      if (desiredEndings.some((ending) => address.endsWith(ending))) {
+        const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
 
-          parentPort.postMessage(foundData); // Send the result to the Main Thread
-          //  return; // Exit immediately after finding a match
-        }
+        parentPort.postMessage(foundData); // Send the result to the Main Thread
+        // return; // Exit immediately after finding a match (if needed)
       }
     }
   }
