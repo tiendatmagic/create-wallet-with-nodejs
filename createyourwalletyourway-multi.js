@@ -7,7 +7,7 @@ const os = require('os');
 
 if (isMainThread) {
   // === Main Thread Logic ===
-  const desiredEndings = ['1234', '12345', '123456', '99999', '999999', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888'];
+  const desiredEndings = ['123456', '99999', '999999', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '00000', '11111', '22222', '33333', '44444', '55555', '66666', '77777', '88888']
   const numThreads = 5; // Number of logical CPU cores
   console.log(`Detected ${numThreads} CPU cores. Using ${numThreads} threads.`);
 
