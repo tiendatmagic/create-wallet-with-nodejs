@@ -5,83 +5,163 @@ const ethUtil = require('ethereumjs-util');
 const fs = require('fs');
 const os = require('os');
 
+// Hàm format thời gian theo định dạng HH:MM:SS
+function formatDuration(totalSeconds) {
+  const sec = Math.floor(totalSeconds % 60);
+  const min = Math.floor((totalSeconds / 60) % 60);
+  const hour = Math.floor(totalSeconds / 3600);
+  return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
 if (isMainThread) {
   // === Main Thread Logic ===
-  const desiredEndings = ['123456', '99999', '999999', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '00000', '11111', '22222', '33333', '44444', '55555', '66666', '77777', '88888'];
-  const numThreads = os.cpus().length; // Detect CPU cores
-  console.log(`Detected ${numThreads} CPU cores. Using ${numThreads} threads.`);
+  const desiredEndings = ['12345', '00000', '11111', '22222', '33333', '44444', '55555', '66666', '77777', '88888', '99999', '99'];
+  const numThreads = os.cpus().length; // Nhận diện số lõi CPU
 
-  console.log(`Main thread: Spawning ${numThreads} workers to find addresses.`);
+  console.log('=============================================================');
+  console.log('🚀 BẮT ĐẦU DÒ TÌM VÍ ETHEREUM ĐA LUỒNG (VANITY WALLET)');
+  console.log(`💻 Phát hiện: ${numThreads} CPU Cores -> Sử dụng ${numThreads} luồng (Workers)`);
+  console.log(`🎯 Đuôi địa chỉ cần tìm: ${desiredEndings.join(', ')}`);
+  console.log('⚡ Tốc độ dò (seed phrase / giây) sẽ cập nhật liên tục mỗi giây bên dưới:');
+  console.log('=============================================================\n');
 
-  // Create worker threads
+  // SharedArrayBuffer để các worker cập nhật số lượng ví đã dò mà không nghẽn IPC
+  const sharedBuffer = new SharedArrayBuffer(numThreads * 8);
+  const counts = new BigInt64Array(sharedBuffer);
+
+  const startTime = Date.now();
+  let lastCheckTime = startTime;
+  let lastTotalCount = 0n;
+
+  // Tạo và chạy các worker
+  const workers = [];
   for (let i = 0; i < numThreads; i++) {
     const worker = new Worker(__filename, {
-      workerData: { desiredEndings }, // Pass desiredEndings without batchSize
+      workerData: {
+        workerIndex: i,
+        sharedBuffer,
+        desiredEndings
+      },
     });
 
-    // Listen for messages from the worker
+    // Lắng nghe sự kiện tìm thấy ví phù hợp
     worker.on('message', (message) => {
-      if (message.type === 'progress') {
-        console.log(`Worker ${i}: Generated ${message.count} wallets so far.`);
-      } else if (message.type === 'found') {
-        console.log(`Found by Worker ${i}:`, message.data);
+      if (message.type === 'found') {
+        if (process.stdout.isTTY) {
+          process.stdout.write('\r\x1b[K'); // Xóa dòng trạng thái hiện tại
+        }
 
-        // Write the result to a file
-        fs.writeFileSync('found.txt', message.data + '\n', { flag: 'a' });
+        console.log('\n=============================================================');
+        console.log(`🎉 [TÌM THẤY VÍ PHÙ HỢP] bởi Worker ${i}!`);
+        console.log('-------------------------------------------------------------');
+        console.log(message.data);
+        console.log('-------------------------------------------------------------');
+        console.log('📁 Đã lưu thông tin vào file: found.txt');
+        console.log('=============================================================\n');
+
+        // Ghi kết quả vào file
+        fs.writeFileSync('found.txt', message.data + '\n\n', { flag: 'a' });
       }
     });
 
-    // Handle errors from the worker
+    // Bắt lỗi từ worker
     worker.on('error', (err) => {
-      console.error(`Worker ${i} encountered an error:`, err);
+      console.error(`\n❌ Worker ${i} gặp lỗi:`, err);
     });
 
-    // Handle when the worker finishes
+    // Xử lý khi worker dừng
     worker.on('exit', (code) => {
       if (code !== 0) {
-        console.error(`Worker ${i} stopped with exit code ${code}`);
-      } else {
-        console.log(`Worker ${i} finished successfully.`);
+        console.error(`\n⚠️ Worker ${i} dừng với mã lỗi ${code}`);
       }
     });
+
+    workers.push(worker);
   }
+
+  // Định kỳ mỗi 1 giây (1000ms) tính toán và hiển thị tốc độ dò theo giây
+  const statsInterval = setInterval(() => {
+    const now = Date.now();
+    const elapsedSec = (now - startTime) / 1000;
+    const intervalSec = (now - lastCheckTime) / 1000;
+
+    let currentTotal = 0n;
+    for (let j = 0; j < numThreads; j++) {
+      currentTotal += counts[j];
+    }
+
+    const diff = Number(currentTotal - lastTotalCount);
+    const speed = intervalSec > 0 ? Math.round(diff / intervalSec) : 0;
+    const avgSpeed = elapsedSec > 0 ? Math.round(Number(currentTotal) / elapsedSec) : 0;
+
+    lastTotalCount = currentTotal;
+    lastCheckTime = now;
+
+    const timeStr = formatDuration(elapsedSec);
+    const speedStr = `${speed.toLocaleString('en-US')} seed/s`;
+    const avgStr = `${avgSpeed.toLocaleString('en-US')} seed/s`;
+    const totalStr = currentTotal.toLocaleString('en-US');
+
+    // Thể hiện rõ ràng tốc độ theo giây
+    const statusLine = `[⏱️ ${timeStr}] ⚡ Tốc độ: ${speedStr} (TB: ${avgStr}) | Đã dò: ${totalStr} seed phrases | Threads: ${numThreads}`;
+
+    if (process.stdout.isTTY) {
+      process.stdout.write(`\r\x1b[K${statusLine}`);
+    } else {
+      console.log(statusLine);
+    }
+  }, 1000);
+
+  // Khi người dùng bấm Ctrl + C để dừng
+  process.on('SIGINT', () => {
+    clearInterval(statsInterval);
+
+    const totalElapsed = (Date.now() - startTime) / 1000;
+    let finalTotal = 0n;
+    for (let j = 0; j < numThreads; j++) {
+      finalTotal += counts[j];
+    }
+    const finalAvgSpeed = totalElapsed > 0 ? Math.round(Number(finalTotal) / totalElapsed) : 0;
+
+    console.log('\n\n--- 🛑 ĐÃ DỪNG TIẾN TRÌNH DÒ VÍ ---');
+    console.log(`⏱️ Tổng thời gian chạy: ${formatDuration(totalElapsed)}`);
+    console.log(`📊 Tổng số seed phrase đã dò: ${finalTotal.toLocaleString('en-US')}`);
+    console.log(`⚡ Tốc độ trung bình toàn bộ: ${finalAvgSpeed.toLocaleString('en-US')} seed/s`);
+    process.exit(0);
+  });
+
 } else {
   // === Worker Thread Logic ===
-  const { desiredEndings } = workerData;
+  const { desiredEndings, workerIndex, sharedBuffer } = workerData;
+  const counts = new BigInt64Array(sharedBuffer);
 
-  async function findAddressWithEnding() {
-    let mnemonic;
-    let seed;
-    let hdwallet;
-    let count = 0; // Counter for generated wallets
-
+  function findAddressWithEnding() {
     while (true) {
-      // Generate mnemonic
-      mnemonic = bip39.generateMnemonic(256);
+      // 1. Tạo mnemonic (256-bit entropy -> 24 từ seed phrase)
+      const mnemonic = bip39.generateMnemonic(256);
 
-      // Convert mnemonic to seed
-      seed = bip39.mnemonicToSeedSync(mnemonic);
+      // 2. Chuyển mnemonic thành seed
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
 
-      // Create HD wallet from the seed
-      hdwallet = HDKey.fromMasterSeed(seed);
+      // 3. Tạo HD wallet từ seed
+      const hdwallet = HDKey.fromMasterSeed(seed);
 
-      // Derive the first address from "m/44'/60'/0'/0/0"
+      // 4. Derive địa chỉ đầu tiên (m/44'/60'/0'/0/0)
       const wallet = hdwallet.derive("m/44'/60'/0'/0/0");
       const address = ethUtil.pubToAddress(wallet.publicKey, true).toString('hex');
 
-      // Increment wallet count
-      count++;
+      // 5. Cập nhật số lượng đã dò vào bộ nhớ chia sẻ chung (SharedArrayBuffer)
+      counts[workerIndex]++;
 
-      // Send progress to main thread every 1000 wallets
-      if (count % 1000 === 0) {
-        parentPort.postMessage({ type: 'progress', count });
-      }
-
-      // Check if the address ends with any of the desired endings
+      // 6. Kiểm tra đuôi mong muốn
       if (desiredEndings.some((ending) => address.endsWith(ending))) {
-        const foundData = `Mnemonic: ${mnemonic}\nAddress: 0x${address}\nPrivate Key: ${wallet.privateKey.toString('hex')}\nIndex: 0`;
+        const foundData =
+          `Mnemonic: ${mnemonic}\n` +
+          `Address: 0x${address}\n` +
+          `Private Key: ${wallet.privateKey.toString('hex')}\n` +
+          `Index: 0`;
 
-        parentPort.postMessage({ type: 'found', data: foundData }); // Send the result to the Main Thread
+        parentPort.postMessage({ type: 'found', data: foundData });
       }
     }
   }
