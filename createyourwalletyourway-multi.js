@@ -4,6 +4,7 @@ const HDKey = require('hdkey');
 const ethUtil = require('ethereumjs-util');
 const fs = require('fs');
 const os = require('os');
+const path = require('path');
 
 // Hàm format thời gian theo định dạng HH:MM:SS
 function formatDuration(totalSeconds) {
@@ -13,15 +14,37 @@ function formatDuration(totalSeconds) {
   return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+// Hàm đọc Passphrase từ file riêng bí mật (passphrase.txt)
+function getPassphrase() {
+  const secretFile = path.join(__dirname, 'passphrase.txt');
+  if (fs.existsSync(secretFile)) {
+    const content = fs.readFileSync(secretFile, 'utf8').trim();
+    if (content) return content;
+  }
+  // Fallback: nhận từ tham số dòng lệnh nếu có
+  return (process.argv[2] || '').trim();
+}
+
 if (isMainThread) {
   // === Main Thread Logic ===
-  const desiredEndings = ['12345', '00000', '11111', '22222', '33333', '44444', '55555', '66666', '77777', '88888', '99999', '99'];
+  const desiredEndings = ['12345', '00000', '11111', '22222', '33333', '44444', '55555', '66666', '77777', '88888', '99999'];
+  
+  // Đọc Passphrase từ file bí mật passphrase.txt
+  const passphrase = getPassphrase();
+
   const numThreads = os.cpus().length; // Nhận diện số lõi CPU
+
+  const maskedPass = passphrase
+    ? (passphrase.length > 2
+        ? `${passphrase[0]}***${passphrase.slice(-1)} (Đã tải bí mật từ passphrase.txt - độ dài: ${passphrase.length} ký tự)`
+        : '*** (Đã tải bí mật từ passphrase.txt)')
+    : '(Không sử dụng - file passphrase.txt đang trống)';
 
   console.log('=============================================================');
   console.log('🚀 BẮT ĐẦU DÒ TÌM VÍ ETHEREUM ĐA LUỒNG (VANITY WALLET)');
   console.log(`💻 Phát hiện: ${numThreads} CPU Cores -> Sử dụng ${numThreads} luồng (Workers)`);
   console.log(`🎯 Đuôi địa chỉ cần tìm: ${desiredEndings.join(', ')}`);
+  console.log(`🔐 Passphrase: ${maskedPass}`);
   console.log('⚡ Tốc độ dò (seed phrase / giây) sẽ cập nhật liên tục mỗi giây bên dưới:');
   console.log('=============================================================\n');
 
@@ -40,7 +63,8 @@ if (isMainThread) {
       workerData: {
         workerIndex: i,
         sharedBuffer,
-        desiredEndings
+        desiredEndings,
+        passphrase
       },
     });
 
@@ -132,7 +156,7 @@ if (isMainThread) {
 
 } else {
   // === Worker Thread Logic ===
-  const { desiredEndings, workerIndex, sharedBuffer } = workerData;
+  const { desiredEndings, workerIndex, sharedBuffer, passphrase = '' } = workerData;
   const counts = new BigInt64Array(sharedBuffer);
 
   function findAddressWithEnding() {
@@ -140,8 +164,8 @@ if (isMainThread) {
       // 1. Tạo mnemonic (256-bit entropy -> 24 từ seed phrase)
       const mnemonic = bip39.generateMnemonic(256);
 
-      // 2. Chuyển mnemonic thành seed
-      const seed = bip39.mnemonicToSeedSync(mnemonic);
+      // 2. Chuyển mnemonic thành seed (kèm passphrase nếu được cung cấp)
+      const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
 
       // 3. Tạo HD wallet từ seed
       const hdwallet = HDKey.fromMasterSeed(seed);
@@ -157,6 +181,7 @@ if (isMainThread) {
       if (desiredEndings.some((ending) => address.endsWith(ending))) {
         const foundData =
           `Mnemonic: ${mnemonic}\n` +
+          (passphrase ? `Passphrase: ${passphrase}\n` : '') +
           `Address: 0x${address}\n` +
           `Private Key: ${wallet.privateKey.toString('hex')}\n` +
           `Index: 0`;

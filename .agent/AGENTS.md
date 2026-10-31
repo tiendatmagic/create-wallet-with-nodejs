@@ -8,13 +8,22 @@
 
 ### 1. Cải tiến hiển thị tốc độ dò theo giây (createyourwalletyourway-multi.js)
 - **Yêu cầu:** Thể hiện rõ tốc độ dò được theo từng giây (ví dụ: `200 seed phrase/s` hoặc `200/s`).
-- **Hiện trạng trước đó:**
-  - Worker chỉ gửi message khi đủ 1000 ví (`count % 1000 === 0`), do PBKDF2 nặng nên mất hàng chục giây mới in một dòng log.
-  - Tốc độ tổng tính lệch pha, console bị trôi dòng lộn xộn.
-- **Giải pháp thực hiện:**
-  - Dùng `SharedArrayBuffer` (`BigInt64Array`) chia sẻ bộ nhớ đếm giữa các Worker threads và Main thread (hiệu năng tối đa, không nghẽn IPC).
-  - Main thread dùng `setInterval` đúng 1 giây cập nhật số liệu chính xác theo thời gian thực (real-time).
-  - Hiển thị rõ: **Tốc độ hiện tại (seed/s)**, **Tốc độ trung bình (TB/s)**, **Tổng số seed phrase/ví đã dò**, **Thời gian đã chạy (HH:MM:SS)**.
-  - Cập nhật tại chỗ trên một dòng mượt mà (`\r`), khi tìm thấy ví (`found`) thì in banner nổi bật và ghi vào file `found.txt`.
-  - Bắt tín hiệu `SIGINT` (Ctrl+C) để in báo cáo thống kê trước khi thoát.
+- **Giải pháp:**
+  - Dùng `SharedArrayBuffer` (`BigInt64Array`) giữa Main thread và các Worker threads.
+  - Main thread dùng `setInterval` 1 giây để tính toán và cập nhật real-time.
+  - Hiển thị: Tốc độ tức thời (seed/s), Tốc độ TB, Tổng số seed phrases đã dò, Thời gian chạy.
 
+### 2. Hỗ trợ tùy chọn Passphrase (BIP-39) cho createwallet.js và createyourwalletyourway-multi.js
+- **Yêu cầu:** Thêm khả năng truyền Passphrase vào khi tạo ví đơn lẻ và khi dò ví đa luồng.
+- **Thực hiện:**
+  - [createwallet.js](createwallet.js): Nhận passphrase từ file bí mật riêng hoặc dòng lệnh, truyền vào `bip39.mnemonicToSeedSync(mnemonic, passphrase)`.
+  - [createyourwalletyourway-multi.js](createyourwalletyourway-multi.js): Truyền qua `workerData`, gọi `mnemonicToSeedSync(mnemonic, passphrase)`, ghi vào `found.txt` khi tìm thấy.
+
+### 3. Tách Passphrase ra file riêng bí mật (passphrase.txt)
+- **Yêu cầu:** Có một file riêng để nhập passphrase bảo mật, không để lộ trên command line hay code chính.
+- **Thực hiện:**
+  - Tạo file [passphrase.txt](passphrase.txt) tại thư mục gốc dự án. Người dùng chỉ cần mở file này và gõ mật khẩu vào.
+  - Thêm `passphrase.txt` và `.env` vào [.gitignore](.gitignore) để ngăn chặn việc commit mật khẩu lên Git.
+  - Cả [createwallet.js](createwallet.js) và [createyourwalletyourway-multi.js](createyourwalletyourway-multi.js) tự động đọc mật khẩu từ [passphrase.txt](passphrase.txt).
+  - Tự động che giấu (mask `M***3`) mật khẩu khi hiển thị ở Console để chống nhìn trộm (shoulder surfing).
+  - Nếu file trống, hệ thống tự động hiểu là không dùng passphrase.

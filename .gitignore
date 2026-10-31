@@ -1,2 +1,4 @@
 node_modules
 found.txt
+passphrase.txt
+.env

@@ -2,6 +2,21 @@
 const bip39 = require('bip39');
 const HDKey = require('hdkey');
 const ethUtil = require('ethereumjs-util');
+const fs = require('fs');
+const path = require('path');
+
+// Hàm đọc Passphrase từ file riêng bí mật (passphrase.txt)
+function getPassphrase() {
+  const secretFile = path.join(__dirname, 'passphrase.txt');
+  if (fs.existsSync(secretFile)) {
+    const content = fs.readFileSync(secretFile, 'utf8').trim();
+    if (content) return content;
+  }
+  // Fallback: nhận từ tham số dòng lệnh nếu có
+  return (process.argv[2] || '').trim();
+}
+
+const passphrase = getPassphrase();
 
 // Generate a 12-word mnemonic (128 bits for 12 words)
 // Generate a 15-word mnemonic (160 bits for 15 words)
@@ -11,8 +26,18 @@ const ethUtil = require('ethereumjs-util');
 const mnemonic = bip39.generateMnemonic(160);
 console.log("Your mnemonic phrase:", mnemonic);
 
-// Convert mnemonic to seed
-const seed = bip39.mnemonicToSeedSync(mnemonic);
+if (passphrase) {
+  // Che bớt ký tự trên console để tránh bị nhìn trộm (bảo mật)
+  const masked = passphrase.length > 2
+    ? passphrase[0] + '*'.repeat(Math.min(passphrase.length - 2, 8)) + passphrase.slice(-1)
+    : '***';
+  console.log(`Passphrase: ${masked} (Đã tải bí mật từ file passphrase.txt)`);
+} else {
+  console.log("Passphrase: (Không sử dụng - file passphrase.txt đang trống)");
+}
+
+// Convert mnemonic to seed (có kèm passphrase nếu có)
+const seed = bip39.mnemonicToSeedSync(mnemonic, passphrase);
 console.log("Seed:", seed.toString('hex'));
 
 // Create HD wallet from the seed
