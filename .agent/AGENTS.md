@@ -26,4 +26,7 @@
   - Thêm `passphrase.txt` và `.env` vào [.gitignore](.gitignore) để ngăn chặn việc commit mật khẩu lên Git.
   - Cả [createwallet.js](createwallet.js) và [createyourwalletyourway-multi.js](createyourwalletyourway-multi.js) tự động đọc mật khẩu từ [passphrase.txt](passphrase.txt).
   - Tự động che giấu (mask `M***3`) mật khẩu khi hiển thị ở Console để chống nhìn trộm (shoulder surfing).
-  - Nếu file trống, hệ thống tự động hiểu là không dùng passphrase.
+  - **Cơ chế chịu lỗi (Fault Tolerance) & Tự phục hồi (Auto-recovery):**
+    - Nếu file `passphrase.txt` bị xóa, chương trình **không bị lỗi / crash**.
+    - Hệ thống tự động chuyển sang chế độ không dùng passphrase (Standard Wallet).
+    - Đồng thời script **tự động tạo lại file `passphrase.txt` mới** sẵn cho người dùng mà không cần phải tự tạo tay.

@@ -17,10 +17,18 @@ function formatDuration(totalSeconds) {
 // Hàm đọc Passphrase từ file riêng bí mật (passphrase.txt)
 function getPassphrase() {
   const secretFile = path.join(__dirname, 'passphrase.txt');
-  if (fs.existsSync(secretFile)) {
-    const content = fs.readFileSync(secretFile, 'utf8').trim();
-    if (content) return content;
+  
+  // Nếu file bị xóa, tự động tạo lại file rỗng để người dùng tiện sử dụng lại
+  if (!fs.existsSync(secretFile)) {
+    try {
+      fs.writeFileSync(secretFile, '', 'utf8');
+    } catch (_) {}
+    return (process.argv[2] || '').trim();
   }
+
+  const content = fs.readFileSync(secretFile, 'utf8').trim();
+  if (content) return content;
+
   // Fallback: nhận từ tham số dòng lệnh nếu có
   return (process.argv[2] || '').trim();
 }
